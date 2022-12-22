@@ -893,5 +893,6 @@ class all_sku_goods:
         except Exception as e:
 
             print('Error:', e)
-    
+   ####test1
+
 
