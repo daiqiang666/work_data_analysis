@@ -364,9 +364,84 @@ class whole(object):
         
         print('整体的销售毛利库存数据的excel文件导出 over')
         return
+    
+    ######针对全年、大类维度的总体分析(2023/01/04)############
+ 
+    #导入大类维度的原始的销售csv文件
+    def load_data_category_sale(self,*file_list):
+        #配置参数
+
+        company=self.in_company
+        date_Range=self.in_date_Range
+        date_Range_all=self.in_date_Range_all
+        load_data_path=self.in_path
+        put_file_path=self.out_path
+        load_public_data_path=self.public_path
         
+        read_file = rw_file.rw_csv()
+        
+        in_file_sale=file_list[0]
+        in_file_category=file_list[1]
+
+        #导入销售数据
+        df_原始销售 = read_file.r_csv_utf8(load_data_path+in_file_sale,0,0)
+
+        #导入类别主档数据
+        df_类别 = read_file.r_csv_utf8(self.public_path+in_file_category,0,0)
+
+
+        print('导入原始销售数据、类别主档 over')
+        return df_原始销售,df_类别
    
+    #导入大类维度的原始的券csv文件
+    def load_data_category_coupon(self,*file_list):
+        #配置参数
+
+        company=self.in_company
+        date_Range=self.in_date_Range
+        date_Range_all=self.in_date_Range_all
+        load_data_path=self.in_path
+        put_file_path=self.out_path
+        load_public_data_path=self.public_path
         
+        read_file = rw_file.rw_csv()
+        
+        in_file_coupon=file_list[0]
+        
+
+        #导入销售数据
+        df_原始用券 = read_file.r_csv_utf8(load_public_data_path+in_file_coupon,0,0)
+
+        print('导入原始用券数据 over')
+        return df_原始用券
+    
+    #导入大类维度的原始的OIcsv文件
+    def load_data_category_oi(self,*file_list):
+        #配置参数
+
+        company=self.in_company
+        date_Range=self.in_date_Range
+        date_Range_all=self.in_date_Range_all
+        load_data_path=self.in_path
+        put_file_path=self.out_path
+        load_public_data_path=self.public_path
+        
+        read_file = rw_file.rw_csv()
+        
+        
+        in_file_oi=file_list[0]
+        
+        ###导入采购收入xls
+        df_采购收入原始数据 = read_file.r_csv_ansi(load_public_data_path + in_file_oi,0,0)
+        # 删选省区业绩的采购收入
+        bool2=~df_采购收入原始数据['扣项类型'].str.contains('装卸|搬运')
+        df_采购收入原始数据=df_采购收入原始数据[bool2]
+        df_采购收入原始数据.rename(columns={'发生机构':'门店DC编码'},inplace=True)
+
+
+        print('导入原始OI数据 over')
+        return df_采购收入原始数据
+    
 
         
 
