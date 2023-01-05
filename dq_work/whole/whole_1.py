@@ -442,6 +442,162 @@ class whole(object):
         print('导入原始OI数据 over')
         return df_采购收入原始数据
     
+    #导入大类维度的原始的库存csv文件
+    def load_data_category_stock(self,*file_list):
+        #配置参数
+
+        company=self.in_company
+        date_Range=self.in_date_Range
+        date_Range_all=self.in_date_Range_all
+        load_data_path=self.in_path
+        put_file_path=self.out_path
+        load_public_data_path=self.public_path
+        
+        read_file = rw_file.rw_csv()
+        
+        in_file_stock=file_list[0]
+
+
+        #导入销售数据
+        df_原始库存 = read_file.r_csv_utf8(load_data_path+in_file_stock,0,0)
+
+
+
+
+        print('导入原始库存 over')
+        return df_原始库存
+    
+    
+    
+    
+    
+    def sale_coupons_oi_stock_join_category(self,*df_list):
+        #导入原始DF
+        df_sale=df_list[0]
+        df_coupon=df_list[1]
+        df_oi=df_list[2]
+        df_stock=df_list[3]
+        
+        
+        #到大类销售数据的处理
+        g_sale=df_sale.groupby(['大类编码'])
+        df_g_sale=pd.DataFrame(g_sale[['销售数量', '销售净额折前', '销售净额', '销售成本', '折扣净额', \
+                               '生鲜损耗', '补差', '销售毛利', '系统毛利额', '客流量']].sum())
+        #取消索引
+        df_g_sale.reset_index(inplace=True)
+        df_g_sale['销售毛利率']=df_g_sale['销售毛利'] / df_g_sale['销售净额']
+
+        ################处理券数据###############
+        #
+        g_coupon =df_coupon.groupby(['大类编码'])
+        df_g_coupon=pd.DataFrame(g_coupon[[ '总用券金额', '供应商承担金额', '平台承担金额', '万家承担金额']].sum())
+        #取消索引
+        df_g_coupon.reset_index(inplace=True)
+        
+        
+        ################处理oi数据###############
+        #
+        g_oi =df_oi.groupby(['大类编码'])
+        df_g_oi=pd.DataFrame(g_oi[['金额']].sum())
+        #取消索引
+        df_g_oi.reset_index(inplace=True)
+        
+        
+        ################处理库存数据###############
+          
+        
+        g_stock =df_stock.groupby(['大类编码'])
+        df_g_stock=pd.DataFrame(g_stock[['自营-销售成本','库存金额']].sum())
+        #取消索引
+        df_g_stock.reset_index(inplace=True)
+        
+        #计算年周转
+        df_g_stock['周转天数']= df_g_stock['库存金额'] / df_g_stock['自营-销售成本']
+        df_g_stock['周转次数']= 365 / df_g_stock['周转天数']
+
+
+        #销售数据与券数据的合并
+        ###按照销售数据为标准，剔除不在销售数据模块范围内的券金额
+        df_合并1=pd.merge(df_g_sale,df_g_coupon,on=['大类编码'],how='outer')
+        
+        
+        #计算券后指标
+        df_合并1['销售用券率']=df_合并1['万家承担金额'] / df_合并1['销售净额']
+        df_合并2=df_合并1.fillna(0)
+        df_合并2['券后毛利额']=df_合并2['销售毛利']-df_合并2['万家承担金额']
+        df_合并2['券后毛利率']=df_合并2['券后毛利额']/df_合并2['销售净额']
+        df_合并2=df_合并2.replace([np.inf, -np.inf], 0)
+
+       
+        #与oi合并
+        df_合并3=pd.merge(df_合并2,df_g_oi,on=['大类编码'],how='outer')
+        
+        #与stock合并
+        df_合并4=pd.merge(df_合并3,df_g_stock,on=['大类编码'],how='outer')        
+        
+        
+        
+        #比对数据一致性
+        print(df_sale.loc[:,['销售净额']].sum()) 
+        print(df_coupon.loc[:,['万家承担金额']].sum())
+        print(df_oi.loc[:,['金额']].sum()) 
+        print(df_stock.loc[:,['库存金额']].sum()) 
+        print('===========================================')
+        
+        print(df_合并4.loc[:,['销售净额']].sum()) 
+        print(df_合并4.loc[:,['万家承担金额']].sum()) 
+        print(df_合并4.loc[:,['金额']].sum())
+        print(df_合并4.loc[:,['库存金额']].sum())
+           
+        print('销售、券、oi、stock数据合并完成')
+        
+        
+        return df_合并4
+    
+    #进一步精加工输出的文件格式与内容
+    def finish_machining_outfile_category(self,*df_list):
+        
+        df_out=df_list[0]
+
+        df_类别=df_list[1]
+        
+        
+        df_大类主档=df_类别.loc[:,['模块编码','模块名称','大类编码','大类名称']]
+        df_大类主档.drop_duplicates(subset = ['大类编码'],keep='first',inplace=True)
+        
+
+        df_out1=pd.merge(df_out,df_大类主档,on=['大类编码'],how='left')
+
+        print('精加工 dataframe over')
+        return df_out1
+    
+    
+    #将结果落库到mysql
+    def input_mysql_category(self,in_df,in_table):
+        try:
+            from sqlalchemy.orm import sessionmaker
+            
+            
+            #删除清理数据表
+            Session = sessionmaker(bind=dq_work_engine)
+            session = Session()
+            session.begin()
+            sql_proc1='drop table if exists '+ in_table;
+                   
+            session.execute(sql_proc1)
+    
+            session.commit()
+            session.close()
+            in_df = in_df.replace([np.inf, -np.inf], 0)
+            in_df.to_sql(in_table,dq_work_engine,index = False,if_exists='append')
+ 
+            print('input mysql finish')
+
+
+        except Exception as e:
+            session.rollback()
+            session.close()
+            print('Error:', e)
 
         
 
