@@ -489,6 +489,7 @@ class whole(object):
 
         ################处理券数据###############
         #
+        df_coupon.fillna(0,inplace=True)
         g_coupon =df_coupon.groupby(['大类编码'])
         df_g_coupon=pd.DataFrame(g_coupon[[ '总用券金额', '供应商承担金额', '平台承担金额', '万家承担金额']].sum())
         #取消索引
@@ -523,7 +524,9 @@ class whole(object):
         
         #计算券后指标
         df_合并1['销售用券率']=df_合并1['万家承担金额'] / df_合并1['销售净额']
+        #df_合并2=df_合并1.fillna({'万家承担金额':0})
         df_合并2=df_合并1.fillna(0)
+        
         df_合并2['券后毛利额']=df_合并2['销售毛利']-df_合并2['万家承担金额']
         df_合并2['券后毛利率']=df_合并2['券后毛利额']/df_合并2['销售净额']
         df_合并2=df_合并2.replace([np.inf, -np.inf], 0)
@@ -550,7 +553,6 @@ class whole(object):
         print(df_合并4.loc[:,['库存金额']].sum())
            
         print('销售、券、oi、stock数据合并完成')
-        
         
         return df_合并4
     
