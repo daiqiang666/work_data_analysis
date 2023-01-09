@@ -894,5 +894,5 @@ class all_sku_goods:
 
             print('Error:', e)
     
-    ##2023/01/03,github测试第一次
+    ####2023/01/03,github测试第2次
 
