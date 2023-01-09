@@ -70,8 +70,8 @@ class goods:
         df_原始销售[['门店DC编码']]=df_原始销售[['门店DC编码']].astype(str)
         df_原始销售['门店DC编码']=df_原始销售['门店DC编码'].str.strip()
         
-        df_原始用券[['门店编码']]=df_原始用券[['门店编码']].astype(str)
-        df_原始用券['门店编码']=df_原始用券['门店编码'].str.strip()
+        df_原始用券[['门店DC编码']]=df_原始用券[['门店DC编码']].astype(str)
+        df_原始用券['门店DC编码']=df_原始用券['门店DC编码'].str.strip()
         
         df_门店_主档[['门店DC编码']]=df_门店_主档[['门店DC编码']].astype(str)
         df_门店_主档['门店DC编码']=df_门店_主档['门店DC编码'].str.strip()
@@ -120,11 +120,11 @@ class goods:
 
         ################处理券数据###############
         #到单店单品级维度的券数据的处理
-        g_1_quan =df_原始用券.groupby(['大类编码','门店编码','渠道','商品编码'])
+        g_1_quan =df_原始用券.groupby(['大类编码','门店DC编码','渠道','商品编码'])
         df_1_quan=pd.DataFrame(g_1_quan[['万家承担金额（去税）']].sum())
         #取消索引
         df_1_quan.reset_index(inplace=True)
-        df_1_quan.rename(columns={'门店编码':'门店DC编码'},inplace=True)
+        #df_1_quan.rename(columns={'门店编码':'门店DC编码'},inplace=True)
 
         #销售数据与券数据的合并
         ###按照销售数据为标准，剔除不在销售数据模块范围内的券金额
@@ -517,7 +517,7 @@ class goods:
         return df_stock_out
     
     #销售与库存的合并
-    def merge_sale_stock(self,*df_list):
+    def merge_sale_stock(self,days_num,*df_list):
         df_sale=df_list[0]
         df_stock=df_list[1]
         
@@ -534,7 +534,7 @@ class goods:
         
         df_out=pd.merge(df_sale_out1,df_stock,on=['大类编码','门店DC编码','商品编码'],how='outer')
         
-        df_out['日库存金额']=df_out['库存金额']/31
+        df_out['日库存金额']=df_out['库存金额']/days_num
         df_out['周转天数']=df_out['库存金额']/df_out['自营-销售成本']
         
 
@@ -574,6 +574,33 @@ class goods:
 
         df_sku.drop_duplicates(subset = ['商品编码'],keep='first',inplace=True)
         return df_sku
+    
+    
+    #将结果落库到mysql
+    def input_mysql(self,in_df,in_table):
+        try:
+            from sqlalchemy.orm import sessionmaker
+            
+            
+            #删除清理数据表
+            Session = sessionmaker(bind=dq_work_engine)
+            session = Session()
+            session.begin()
+            sql_proc1='drop table if exists '+ in_table;
+                   
+            session.execute(sql_proc1)
+    
+            session.commit()
+            session.close()
+            in_df = in_df.replace([np.inf, -np.inf], 0)
+            in_df.to_sql(in_table,dq_work_engine,index = False,if_exists='append')
+ 
+            print('input mysql')
+        except Exception as e:
+            session.rollback()
+            session.close()
+            print('Error:', e)
+
     
     
     
@@ -840,7 +867,6 @@ class all_sku_goods:
         return df_out3
 
     #将结果落库到mysql
-    
     def input_mysql_all_sku(self,in_df,in_table):
         try:
             from sqlalchemy.orm import sessionmaker
@@ -894,5 +920,3 @@ class all_sku_goods:
 
             print('Error:', e)
     
-    ####2023/01/03,github测试第2次
-
