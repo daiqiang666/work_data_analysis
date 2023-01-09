@@ -171,10 +171,10 @@ class whole(object):
         bool_in_dl = df_not_join['大类编码'].isin(df_选择类别.大类编码)
         df_not_join_oi=df_not_join.loc[bool_no_join & bool_in_dl]
         
-        #将没有匹配上的所属类别的采购收入，再按照大类匹配到渠道上
-        #根据大类，计算渠道的销售比例
+        #将没有匹配上的所属类别的采购收入，再按照大类匹配到门店和渠道上
+        #根据大类，计算渠道、门店的销售比例
         g__大类 =df_销售原始数据.groupby([ '大类编码'])
-        df_OI_fentan_no_join=pd.DataFrame(g__大类[[ '大类编码','渠道','销售净额']] \
+        df_OI_fentan_no_join=pd.DataFrame(g__大类[[ '大类编码','门店DC编码','供应商编码','渠道','销售净额']] \
                                        .apply(analysis_1.fentan_oi_sku))
 
         g__大类_OI=df_not_join_oi.groupby(['大类编码'])
@@ -189,8 +189,8 @@ class whole(object):
         df_out1_1.loc[bool3_11,'OI分摊金额']=df_out1_1['金额']
         df_out1_1.loc[bool3_11,'渠道']='XXXX'
         
-        df_out1_1['供应商编码']=999999
-        df_out1_1['门店DC编码']=9999
+        df_out1_1.fillna({'供应商编码':999999,'门店DC编码':9999},inplace=True)
+        #df_out1_1['门店DC编码']=9999
 
         print(df_采收原始数据.loc[:,['金额']].sum())   
                
