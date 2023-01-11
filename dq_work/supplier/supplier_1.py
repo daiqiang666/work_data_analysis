@@ -1,10 +1,14 @@
 
 #!/usr/bin/env python
 # coding: utf-8
+import numpy as np
 from numpy import float64
 import pandas as pd
 from dq_work import rw_file
-
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
+engine=create_engine('mysql+pymysql://root:dqdqdq@localhost:3306/db1?charset=utf8',encoding='utf-8')
+dq_work_engine=create_engine('mysql+pymysql://root:dqdqdq@localhost:3306/dq_work?charset=utf8',encoding='utf-8')
 
 class supplier_analysis:
     def __init__(self,in_company,in_date_Range,in_date_Range_all,in_path,out_path,public_path):
@@ -50,6 +54,49 @@ class supplier_analysis:
 
         print('供应商的券分摊csv文件导出完成')
         return
+    
+    ##根据券的原始数据，直接计算供应商维度的券分摊金额，券原始文件作为函数参数输入
+    def Coupons_share_2(self,in_file1):
+        #配置参数
+
+        company=self.in_company
+        date_Range=self.in_date_Range
+        date_Range_all=self.in_date_Range_all
+        load_data_path=self.in_path
+        put_file_path=self.out_path
+        load_public_data_path=self.public_path
+        
+        rw_file1 = rw_file.rw_csv()
+        
+        #需要准备的导入文件清单
+        ######################################
+        file_dir_0=load_public_data_path
+
+        file_1=in_file1
+        df_券金额原始数据 =  rw_file1.r_csv_utf8(file_dir_0+file_1,0,0)
+        
+        #导出的文件
+        file_out='供应商券分摊_out'+company+ '-Partial-'+date_Range+'.csv'
+        
+        #取得sku的券金额
+        g_大类_供应商=df_券金额原始数据.groupby(['大类编码','供应商业务码'])
+        df_大类_供应商_quan=pd.DataFrame(g_大类_供应商[['万家承担金额（去税）']].sum())
+        #取消索引
+        df_大类_供应商_quan.reset_index(inplace=True)
+        df_大类_供应商_quan.rename(columns={'万家承担金额（去税）':'券分摊金额'},inplace=True)
+
+        #导出供应商的分摊文件
+        rw_file1.w_csv(df_大类_供应商_quan,load_data_path+file_out)
+
+        print('供应商的券分摊csv文件导出完成')
+        return
+    
+    
+    
+    
+    
+    
+    
     
     #根据销售占比，计算分摊供应商维度的券分摊金额
     def Coupons_sales_volume_share(self):
@@ -323,6 +370,150 @@ class supplier_analysis:
 
         print('data DF finish')
         return df_供应商_out
+    
+    def Net_gross_profit_out_df_2(self,*in_file_list):
+        
+        #配置参数
+
+        company=self.in_company
+        date_Range=self.in_date_Range
+        date_Range_all=self.in_date_Range_all
+        load_data_path=self.in_path
+        put_file_path=self.out_path
+        load_public_data_path=self.public_path
+
+        read_file = rw_file.rw_csv()
+        #需要准备的导入文件清单
+        ######################################
+        in_file_dir=load_data_path
+        #supplier_data
+        
+        in_file=in_file_list[0]
+        #public_data
+        in_file2=in_file_list[1]
+        #supplier_data
+        in_file3=in_file_list[2]
+        
+        #public_data
+
+        in_file4=in_file_list[3]
+        
+    
+
+        ######################################
+      
+        #导入供应商的净销售xls
+        df_供应商原始数据 = read_file.r_csv_utf8(in_file_dir + in_file,0,0)
+        
+        ####调整供应商业务码与编码问题
+        df_供应商原始数据.drop('供应商编码',axis=1,inplace=True)
+        df_供应商原始数据.rename(columns={'供应商业务码':'供应商编码'},inplace=True)
+
+ 
+        #导入采购收入xls
+        df_采购收入原始数据 = read_file.r_csv_ansi(load_public_data_path + in_file2,0,0)
+        # 删选省区业绩的采购收入
+        bool2=~df_采购收入原始数据['扣项类型'].str.contains('装卸|搬运')
+        df_采购收入原始数据=df_采购收入原始数据[bool2]
+        
+        #导入供应商维度的券数据xls
+        df_券金额原始数据 = read_file.r_csv_utf8(in_file_dir + in_file3 ,0,0)
+        ####调整供应商业务码与编码问题
+        df_券金额原始数据.rename(columns={'供应商业务码':'供应商编码'},inplace=True)
+        
+        
+        #导入供应商主档的原始数据
+        df_券金额原始数据_zsj = read_file.r_csv_utf8(load_public_data_path + in_file4 ,0,0)
+        ####调整供应商业务码与编码问题
+        df_券金额原始数据_zsj.rename(columns={'供应商业务码':'供应商编码'},inplace=True)
+        
+        
+        ##强制转换原始df的供应商编码类型为str
+        
+       
+        df_供应商原始数据[['供应商编码']]=df_供应商原始数据[['供应商编码']].astype(str) 
+        df_供应商原始数据['供应商编码']=df_供应商原始数据['供应商编码'].str.strip()
+        ###
+        df_采购收入原始数据[['供应商编码']]=df_采购收入原始数据[['供应商编码']].astype(str)  
+        df_采购收入原始数据['供应商编码']=df_采购收入原始数据['供应商编码'].str.strip()
+        
+        df_券金额原始数据[['供应商编码']]=df_券金额原始数据[['供应商编码']].astype(str) 
+        df_券金额原始数据['供应商编码']=df_券金额原始数据['供应商编码'].str.strip()
+        
+        df_券金额原始数据_zsj[['供应商编码']]=df_券金额原始数据_zsj[['供应商编码']].astype(str) 
+        df_券金额原始数据_zsj['供应商编码']=df_券金额原始数据_zsj['供应商编码'].str.strip()
+        
+        
+        
+        
+        print(df_供应商原始数据.loc[:,['销售净额','销售毛利额']].sum())
+        print(df_采购收入原始数据.loc[:,['金额']].sum())
+        print(df_券金额原始数据_zsj.loc[:,['万家承担金额（去税）']].sum())
+        
+        print('load  data is over')
+
+        
+        #计算处理
+        ####计算销售净额等
+        g_销售_供应商 =df_供应商原始数据.groupby(['大类编码', '供应商编码'])
+        df_供应商_销售=pd.DataFrame(g_销售_供应商[['销售净额','销售毛利额']].sum())
+        df_供应商_销售.reset_index(inplace=True)
+
+        
+        ####计算采购收入
+        g_采收_供应商 =df_采购收入原始数据.groupby(['大类编码', '供应商编码'])
+        df_供应商_采收=pd.DataFrame(g_采收_供应商[['金额']].sum())
+        df_供应商_采收.reset_index(inplace=True)
+        
+        
+        ###计算券数据
+        g_券_供应商 =df_券金额原始数据.groupby(['大类编码','供应商编码'])
+        df_供应商_用券金额=pd.DataFrame(g_券_供应商[['券分摊金额']].sum())
+        df_供应商_用券金额.reset_index(inplace=True)
+
+        
+        #形成供应商主档
+        
+        df_gys1=df_供应商原始数据.loc[:,[ '供应商编码', '供应商名称']]
+        df_gys2=df_采购收入原始数据.loc[:,[ '供应商编码', '供应商名称']]
+        df_gys3=df_券金额原始数据_zsj.loc[:,[ '供应商编码', '供应商名称']]
+        df_供应商主档 =df_gys1.append([df_gys2,df_gys3])
+        
+        #转换数据类型
+        '''
+        df_供应商主档[['供应商编码']]=df_供应商主档[['供应商编码']].astype(str) 
+        df_供应商主档['供应商编码']=df_供应商主档['供应商编码'].str.strip()
+        '''
+        df_供应商主档.drop_duplicates(subset = ['供应商编码'],keep='first',inplace=True)
+
+    
+        
+        #计算供应商纯毛利的数据
+        df_供应商_1=pd.merge(df_供应商_销售,df_供应商_采收,on=['大类编码','供应商编码'],how='outer')
+        df_供应商_2=pd.merge(df_供应商_1,df_供应商_用券金额,on=['大类编码','供应商编码'],how='outer')
+
+        df_供应商_out_tmp=pd.merge(df_供应商_2,df_供应商主档,on=['供应商编码'],how='left')
+
+        df_供应商_out_tmp.rename(columns={'券分摊金额':'万家承担金额（去税）'},inplace=True)
+        df_供应商_out_tmp=df_供应商_out_tmp.fillna(0)
+
+        df_供应商_out_tmp['券后总毛利']=df_供应商_out_tmp['销售毛利额']-df_供应商_out_tmp['万家承担金额（去税）']+df_供应商_out_tmp['金额']
+
+        df_供应商_out_tmp['销售净额'] = round(df_供应商_out_tmp['销售净额'],2)
+        df_供应商_out_tmp['销售毛利额'] = round(df_供应商_out_tmp['销售毛利额'],2)
+        df_供应商_out_tmp['金额'] = round(df_供应商_out_tmp['金额'],2)
+        df_供应商_out_tmp['万家承担金额（去税）'] = round(df_供应商_out_tmp['万家承担金额（去税）'],2)
+        df_供应商_out_tmp['券后总毛利'] = round(df_供应商_out_tmp['券后总毛利'],2)
+
+        df_供应商_out_tmp.rename(columns={'金额':'采购收入分摊'},inplace=True)
+        df_供应商_out_tmp.rename(columns={'万家承担金额（去税）':'用券金额分摊'},inplace=True)
+
+
+        df_供应商_out=df_供应商_out_tmp.loc[:,['大类编码','供应商编码','供应商名称','销售净额','销售毛利额','采购收入分摊','用券金额分摊', \
+                                                    '券后总毛利']]
+
+        print('data DF finish')
+        return df_供应商_out
         
 
     def Net_gross_profit_out_xlsx(self,w_df):
@@ -346,6 +537,31 @@ class supplier_analysis:
         print('供应商纯毛利的xls导出 over')
         writer.close()
         return
+    
+    #将结果落库到mysql
+    def input_mysql(self,in_df,in_table):
+        try:
+            from sqlalchemy.orm import sessionmaker
+            
+            
+            #删除清理数据表
+            Session = sessionmaker(bind=dq_work_engine)
+            session = Session()
+            session.begin()
+            sql_proc1='drop table if exists '+ in_table;
+                   
+            session.execute(sql_proc1)
+    
+            session.commit()
+            session.close()
+            in_df = in_df.replace([np.inf, -np.inf], 0)
+            in_df.to_sql(in_table,dq_work_engine,index = False,if_exists='append')
+ 
+            print('input mysql')
+        except Exception as e:
+            session.rollback()
+            session.close()
+            print('Error:', e)
 
     
     
