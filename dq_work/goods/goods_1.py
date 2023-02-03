@@ -668,6 +668,70 @@ class all_sku_goods:
         
         print('导入all sku 原始数据 over')
         return df_原始销售,df_原始用券,df_采购收入原始数据,df_类别,df_商品主档
+    
+    def load_data_all_sku_GoodPath(self,file_list):
+        #配置参数
+
+        company=self.in_company
+        date_Range=self.in_date_Range
+        date_Range_all=self.in_date_Range_all
+        load_data_path=self.in_path
+        put_file_path=self.out_path
+        load_public_data_path=self.public_path
+        
+        in_file1=file_list
+        
+        read_file = rw_file.rw_csv()
+        
+        df_1 = read_file.r_csv_utf8(load_data_path+in_file1,0,0)
+        #df_原始销售.rename(columns={'毛利额':'销售毛利额'},inplace=True)
+        #df_原始销售.rename(columns={'供应商业务码':'供应商编码'},inplace=True)
+
+        print('导入all sku GoodPath 原始数据 over')
+        return df_1
+    
+    def load_data_all_sku_PublicPath(self,file_list):
+        #配置参数
+
+        company=self.in_company
+        date_Range=self.in_date_Range
+        date_Range_all=self.in_date_Range_all
+        load_data_path=self.in_path
+        put_file_path=self.out_path
+        load_public_data_path=self.public_path
+        
+        in_file1=file_list
+        
+        read_file = rw_file.rw_csv()
+        
+
+        df_1 = read_file.r_csv_utf8(load_public_data_path+in_file1,0,0)
+
+        print('导入all sku PublicPath 原始数据 over')
+        return df_1
+    
+    def load_data_all_sku_PublicPath_ansi(self,file_list):
+        #配置参数
+
+        company=self.in_company
+        date_Range=self.in_date_Range
+        date_Range_all=self.in_date_Range_all
+        load_data_path=self.in_path
+        put_file_path=self.out_path
+        load_public_data_path=self.public_path
+        
+        in_file1=file_list
+        
+        read_file = rw_file.rw_csv()
+        
+
+        df_1 = read_file.r_csv_ansi(load_public_data_path+in_file1,0,0)
+
+        print('导入all sku PublicPath 原始数据 over')
+        return df_1
+    
+    
+    
         
     def sale_coupons_join_all_sku(self,*df_list):
         #导入原始DF
@@ -675,7 +739,7 @@ class all_sku_goods:
         df_原始用券=df_list[1]
 
         #到单店单品级维度的销售数据的处理
-        g_1 =df_原始销售.groupby(['大类编码','渠道','商品编码'])
+        g_1 =df_原始销售.groupby(['大类编码','渠道','商品编码','供应商业务码'])
         df_1=pd.DataFrame(g_1[['销售净额','销售成本','销售数量','销售毛利额','折扣净额', '补差', '生鲜损耗']].sum())
         #取消索引
         df_1.reset_index(inplace=True)
@@ -683,7 +747,7 @@ class all_sku_goods:
 
         ################处理券数据###############
         #到单店单品级维度的券数据的处理
-        g_1_quan =df_原始用券.groupby(['大类编码','渠道','商品编码'])
+        g_1_quan =df_原始用券.groupby(['大类编码','渠道','商品编码','供应商业务码'])
         df_1_quan=pd.DataFrame(g_1_quan[['万家承担金额（去税）']].sum())
         #取消索引
         df_1_quan.reset_index(inplace=True)
@@ -691,7 +755,7 @@ class all_sku_goods:
 
         #销售数据与券数据的合并
         ###按照销售数据为标准，剔除不在销售数据模块范围内的券金额
-        df_合并1=pd.merge(df_1,df_1_quan,on=['大类编码','渠道','商品编码'],how='left')
+        df_合并1=pd.merge(df_1,df_1_quan,on=['大类编码','渠道','商品编码','供应商业务码'],how='outer')
         df_合并1['销售用券率']=df_合并1['万家承担金额（去税）'] / df_合并1['销售净额']
         
         #准备券后数据
@@ -720,18 +784,18 @@ class all_sku_goods:
         analysis_1=work1.analysis_index()
 
         #计算单品的销售比例
-        g_供应商_大类 =df_单品销售原始数据.groupby(['供应商编码','大类编码'])
-        df_OI_fentan=pd.DataFrame(g_供应商_大类[['供应商编码','大类编码','渠道','商品编码','销售净额']] \
+        g_供应商_大类 =df_单品销售原始数据.groupby(['供应商业务码','大类编码'])
+        df_OI_fentan=pd.DataFrame(g_供应商_大类[['供应商业务码','大类编码','渠道','商品编码','销售净额']] \
                                        .apply(analysis_1.fentan_oi_sku))
 
 
 
-        g_供应商_大类_OI=df_采收原始数据.groupby(['供应商编码','大类编码'])
+        g_供应商_大类_OI=df_采收原始数据.groupby(['供应商业务码','大类编码'])
         df_OI=pd.DataFrame(g_供应商_大类_OI[['金额']].sum())
         #取消索引
         df_OI.reset_index(inplace=True)
 
-        df_out1=pd.merge(df_OI_fentan,df_OI,on=['供应商编码','大类编码'])
+        df_out1=pd.merge(df_OI_fentan,df_OI,on=['供应商业务码','大类编码'])
 
         #计算分摊金额all_sku
         df_out1.loc[:,'OI分摊金额']=df_out1['OI分摊比例']*df_out1['金额']
@@ -739,7 +803,7 @@ class all_sku_goods:
 
         
         #上述到供应商+大类没有匹配上的，进一步再分摊all_sku
-        df_right_join =pd.merge(df_OI_fentan,df_OI,on=['供应商编码','大类编码'],how='right')
+        df_right_join =pd.merge(df_OI_fentan,df_OI,on=['供应商业务码','大类编码'],how='right')
         bool_no_join = df_right_join ['商品编码'].isna()
 
         df_not_join_oi=copy.copy(df_right_join.loc[bool_no_join])
@@ -788,6 +852,35 @@ class all_sku_goods:
 
         df_sku.drop_duplicates(subset = ['商品编码'],keep='first',inplace=True)
         return df_sku
+    
+    #形成sku主档
+    def create_supplier_master_data(self,*df_list):
+         
+        df_原始销售=df_list[0]
+        df_原始用券=df_list[1]
+        
+        df_1=df_原始销售.loc[:,[ '供应商业务码', '供应商名称']]
+        df_2=df_原始用券.loc[:,[ '供应商业务码', '供应商名称']]
+
+        df_3 =df_1.append([df_2])
+
+        df_3.drop_duplicates(subset = ['供应商业务码'],keep='first',inplace=True)
+        return df_3
+    
+    def create_supplier_master_data_2(self,*df_list):
+         
+        df_原始销售=df_list[0]
+        df_原始用券=df_list[1]
+        df_原始oi=df_list[2]
+        
+        df_1=df_原始销售.loc[:,[ '供应商业务码', '供应商名称']]
+        df_2=df_原始用券.loc[:,[ '供应商业务码', '供应商名称']]
+        df_3=df_原始oi.loc[:,[ '供应商业务码', '供应商名称']]
+
+        df_4 =df_1.append([df_2,df_3])
+
+        df_4.drop_duplicates(subset = ['供应商业务码'],keep='first',inplace=True)
+        return df_4
     
     ######################################################################################
     ##以下，库存相关脚本
@@ -865,6 +958,18 @@ class all_sku_goods:
         
         print('精加工 dataframe over')
         return df_out3
+    
+    def finish_machining_outfile_supplier(self,*df_list):
+        
+        df_out1=df_list[0]
+        df_供应商主档=df_list[1]
+         
+        
+        df_out2=pd.merge(df_out1,df_供应商主档,on=['供应商业务码'],how='left')
+                
+        print('精加工供应商 over')
+        return df_out2
+    
 
     #将结果落库到mysql
     def input_mysql_all_sku(self,in_df,in_table):
